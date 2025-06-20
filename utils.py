@@ -523,7 +523,7 @@ def get_args_parser():
     parser.add_argument("--max_length", default=256, type=int)
     
     # select dataset
-    parser.add_argument("--dataset", default="CSL_Daily", choices=['CSL_News', "CSL_Daily", "WLASL"])
+    parser.add_argument("--dataset", default="CSL_Daily", choices=['CSL_News', "CSL_Daily", "WLASL", "BOBSL"])
     
     # select task
     parser.add_argument("--task", default="SLT", choices=['SLT', "ISLR", "CSLR"])
@@ -533,5 +533,11 @@ def get_args_parser():
 
     # online inference
     parser.add_argument("--online_video", default="", type=str)
+
+    # Pose format
+    parser.add_argument("--pose_format", default="mediapipe", type=str, choices=["openpose", "mediapipe"],
+                        help="The pose format to use. Options are 'openpose' or 'mediapipe'. "
+                             "This will determine how the pose data is processed and interpreted. "
+                             "Ensure that the pose data is compatible with the selected format.")
 
     return parser
