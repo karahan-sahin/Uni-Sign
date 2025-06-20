@@ -28,11 +28,17 @@ class Graph:
 
     """
 
-    def __init__(self, layout='custom', strategy='uniform', max_hop=1, dilation=1):
+    def __init__(self, layout='custom', strategy='uniform', max_hop=1, dilation=1, pose_format="openpose"):
         self.max_hop = max_hop
         self.dilation = dilation
 
-        self.get_edge(layout)
+        if pose_format == "openpose":
+            self.get_edge(layout)
+        elif pose_format == "mediapipe":
+            self._get_edge_mp(layout)
+        else:
+            raise ValueError("Unsupported pose format. Use 'openpose' or 'mediapipe'.")
+    
         self.hop_dis = get_hop_distance(self.num_node, self.edge, max_hop=max_hop)
         self.get_adjacency(strategy)
 
@@ -97,6 +103,101 @@ class Graph:
             neighbor_link = neighbor_1base
             self.edge = self_link + neighbor_link
             self.center = self.num_node - 1
+    
+    def _get_edge_mp(self, layout):
+        if layout == 'left' or layout == 'right':
+            self.num_node = 21
+            self_link = [(i, i) for i in range(self.num_node)]
+            neighbor_1base = [
+                [0, 1],
+                [1, 2],
+                [2, 3],
+                [3, 4],
+                [0, 5],
+                [5, 6],
+                [6, 7],
+                [7, 8],
+                [0, 9],
+                [9, 10],
+                [10, 11],
+                [11, 12],
+                [0, 13],
+                [13, 14],
+                [14, 15],
+                [15, 16],
+                [0, 17],
+                [17, 18],
+                [18, 19],
+                [19, 20],
+            ]
+            neighbor_link = neighbor_1base
+            self.edge = self_link + neighbor_link
+            self.center = 0
+        
+        elif layout == 'body':
+            self.num_node = 25
+            self_link = [(i, i) for i in range(self.num_node)]
+            neighbor_1base = [
+                [0, 11],
+                [0, 12],
+                [11, 13],
+                [13, 15],
+                [12, 14],
+                [14, 16],
+                [0, 7],
+                [0, 8],
+            ]
+            neighbor_link = neighbor_1base
+            self.edge = self_link + neighbor_link
+            self.center = 0
+
+        elif layout == 'face_all':
+            self.num_node = 129
+            self_link = [] #[(i, i) for i in range(num_node)]
+            neighbor_1base = [
+                # FACE OVAL
+                [56, 37],
+                [37, 65],
+                [65, 31],
+                [31, 38],
+                [38, 16],
+                [16, 58],
+                [58, 40],
+                [40, 46],
+                [46, 45],
+                [45, 60],
+                [60, 44],
+                [44, 47],
+                [47, 106],
+                [106, 121],
+                [121, 107],
+                [107, 108],
+                [108, 102],
+                [102, 119],
+                [119, 78],
+                [78, 100],
+                [100, 93],
+                [93, 126],
+                [126, 99],
+                [99, 117],
+                # MOUTH
+                [23, 25],
+                [25, 3],
+                [3, 87],
+                [87, 85],
+                [85, 91],
+                [91, 4],
+                [4, 61],
+                [61, 23],
+            ] + [
+                # MAP ALL POINTS TO BODY[0]
+                (128, i) for i in
+                [3, 4, 16, 23, 25, 31, 37, 38, 40, 44, 45, 46, 47, 56, 58, 60, 61, 65, 78, 85, 87, 91, 93, 99, 100, 102, 106, 107, 108, 117, 119, 121, 126]
+            ]
+            neighbor_link = neighbor_1base
+            self.edge = self_link + neighbor_link
+            self.center = self.num_node - 1
+
 
     def get_adjacency(self, strategy):
         valid_hop = range(0, self.max_hop + 1, self.dilation)
@@ -147,6 +248,7 @@ class Graph:
 
 
 def get_hop_distance(num_node, edge, max_hop=1):
+    print("Computing Hop Distance Matrix..., num_node:", num_node, "max_hop:", max_hop)
     A = np.zeros((num_node, num_node))
     for i, j in edge:
         A[j, i] = 1

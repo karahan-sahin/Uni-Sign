@@ -81,9 +81,10 @@ class Uni_Sign(nn.Module):
         hidden_dim = args.hidden_dim
         self.proj_linear = nn.ModuleDict()
         for mode in self.modes:
-            self.graph[mode] = Graph(layout=f'{mode}', strategy='distance', max_hop=1)
+            print(f'Building graph for {mode}...')
+            self.graph[mode] = Graph(layout=f'{mode}', strategy='distance', max_hop=1, pose_format=args.pose_format)
             A.append(torch.tensor(self.graph[mode].A, dtype=torch.float32, requires_grad=False))
-            self.proj_linear[mode] = nn.Linear(3, 64)
+            self.proj_linear[mode] = nn.Linear(4, 64)
 
         self.gcn_modules = nn.ModuleDict()
         self.fusion_gcn_modules = nn.ModuleDict()
@@ -97,7 +98,7 @@ class Uni_Sign(nn.Module):
         self.proj_linear['left'] = self.proj_linear['right']
 
         self.part_para = nn.Parameter(torch.zeros(hidden_dim*len(self.modes)))
-        self.pose_proj = nn.Linear(256*4, 768)
+        self.pose_proj = nn.Linear(256*4, 512)
         
         self.apply(self._init_weights)
         
