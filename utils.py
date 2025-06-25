@@ -534,6 +534,24 @@ def get_args_parser():
     # online inference
     parser.add_argument("--online_video", default="", type=str)
 
+    # LLM model
+    parser.add_argument("--model_name_or_path", default="facebook/opt-350m", type=str,
+                        help="The name or path of the LLM model to use for training. "
+                             "This can be a model from the Hugging Face Hub or a local path. "
+                             "Ensure that the model is compatible with the training framework and has been "
+                             "pretrained on a suitable dataset for the task at hand. "
+                             "For example, you can use 'facebook/opt-350m' for a smaller OPT model, or specify a local path to a custom model. "
+                             "This will be used to initialize the language model component of the training pipeline. "
+                             "Make sure to check the model's documentation for any specific requirements or configurations needed for training")
+
+    parser.add_argument("--model_type", default="causal", type=str, choices=["causal", "seq2seq"] ,
+                        help="The type of the LLM model to use. "
+                             "Options are 'causal' or 'seq2seq'. "
+                             "This will determine how the model processes input sequences and generates output. "
+                             "For example, 'causal' is suitable for autoregressive models where the output at each step depends only on the previous outputs, "
+                             "while 'seq2seq' is suitable for models that encode an input sequence and then decode it into an output sequence. "
+                             "Ensure that the model type is compatible with the training data and task requirements. "
+                             "This will affect how the model is initialized and how it processes input data during training and inference. ")
     # Pose format
     parser.add_argument("--pose_format", default="mediapipe", type=str, choices=["openpose", "mediapipe"],
                         help="The pose format to use. Options are 'openpose' or 'mediapipe'. "

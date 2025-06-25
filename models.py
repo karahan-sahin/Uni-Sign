@@ -9,9 +9,8 @@ from einops import rearrange
 import math
 from stgcn_layers import Graph, get_stgcn_chain
 from deformable_attention_2d import DeformableAttention2D
-from transformers import MT5ForConditionalGeneration, T5Tokenizer 
+from transformers import AutoModelForSeq2SeqLM, AutoModelForCausalLM, AutoTokenizer
 import warnings
-from config import mt5_path
 
 def _no_grad_trunc_normal_(tensor, mean, std, a, b):
     # Cut & paste from PyTorch official master until it's in a few official releases - RW
@@ -68,6 +67,8 @@ def trunc_normal_(tensor, mean=0., std=1., a=-2., b=2.):
         >>> nn.init.trunc_normal_(w)
     """
     return _no_grad_trunc_normal_(tensor, mean, std, a, b)
+
+torch.autograd.set_detect_anomaly(True)
 
 class Uni_Sign(nn.Module):
     def __init__(self, args):
@@ -137,9 +138,12 @@ class Uni_Sign(nn.Module):
                     nn.init.constant_(layer.weight, 0)
                     nn.init.constant_(layer.bias, 0)
 
-        self.mt5_model = MT5ForConditionalGeneration.from_pretrained(mt5_path)
-        self.mt5_tokenizer = T5Tokenizer.from_pretrained(mt5_path, legacy=False)
-    
+        if args.model_type == 'causal':
+            self.llm = AutoModelForCausalLM.from_pretrained(args.model_name_or_path)
+            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, legacy=False)
+        elif args.model_type == 'seq2seq':
+            self.llm = AutoModelForSeq2SeqLM.from_pretrained(args.model_name_or_path)
+            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, legacy=False)
         
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -267,39 +271,98 @@ class Uni_Sign(nn.Module):
         inputs_embeds = torch.cat(features, dim=-1) + self.part_para
         inputs_embeds = self.pose_proj(inputs_embeds)
 
-        prefix_token = self.mt5_tokenizer(
+        prefix_token = self.tokenizer(
                                 [f"Translate sign language video to {self.lang}: "] * len(tgt_input["gt_sentence"]),
                                 padding="longest",
                                 truncation=True,
                                 return_tensors="pt",
                             ).to(inputs_embeds.device)
         
-        prefix_embeds = self.mt5_model.encoder.embed_tokens(prefix_token['input_ids'])
+        # prefix_embeds = self.llm.encoder.embed_tokens(prefix_token['input_ids'])
+        prefix_embeds = self.llm.get_input_embeddings()(prefix_token['input_ids'])
         inputs_embeds = torch.cat([prefix_embeds, inputs_embeds], dim=1)
 
         attention_mask = torch.cat([prefix_token['attention_mask'],
                                     src_input['attention_mask']], dim=1)
 
-        tgt_input_tokenizer = self.mt5_tokenizer(tgt_input['gt_sentence'], 
+        tgt_input_tokenizer = self.tokenizer(tgt_input['gt_sentence'], 
                                                 return_tensors="pt", 
                                                 padding=True,
                                                 truncation=True,
                                                 max_length=50)
+        
+        if self.args.model_type == 'seq2seq':
+            labels = tgt_input_tokenizer['input_ids']
+            labels[labels == self.tokenizer.pad_token_id] = -100
             
-        labels = tgt_input_tokenizer['input_ids']
-        labels[labels == self.mt5_tokenizer.pad_token_id] = -100
-        
-        out = self.mt5_model(inputs_embeds = inputs_embeds,
-                    attention_mask = attention_mask,
-                    labels = labels.to(inputs_embeds.device),
-                    return_dict = True,
-                    )
-        
-        label = labels.reshape(-1)
-        out_logits = out['logits']
-        logits = out_logits.reshape(-1,out_logits.shape[-1])
-        loss_fct = torch.nn.CrossEntropyLoss(label_smoothing=self.args.label_smoothing, ignore_index=-100)
-        loss = loss_fct(logits, label.to(out_logits.device, non_blocking=True))
+            out = self.llm(inputs_embeds = inputs_embeds,
+                        attention_mask = attention_mask,
+                        labels = labels.to(inputs_embeds.device),
+                        return_dict = True,
+                        )
+            
+            label = labels.reshape(-1)
+            out_logits = out['logits']
+            logits = out_logits.reshape(-1,out_logits.shape[-1])
+            loss_fct = torch.nn.CrossEntropyLoss(label_smoothing=self.args.label_smoothing, ignore_index=-100)
+            loss = loss_fct(logits, label.to(out_logits.device, non_blocking=True))
+
+
+        elif self.args.model_type == 'causal':
+            labels = tgt_input_tokenizer['input_ids']
+            labels_attention_mask = tgt_input_tokenizer['attention_mask']
+
+            labels = labels.to(inputs_embeds.device)
+            labels_attention_mask = labels_attention_mask.to(inputs_embeds.device)
+
+            labels_embeds = self.llm.get_input_embeddings()(labels)
+            inputs_embeds = torch.cat([inputs_embeds, labels_embeds], dim=1)
+
+            # labels should be the same length as inputs_embeds
+            labels_prefix_length = inputs_embeds.shape[1] - labels.shape[1]
+            # print(
+            #     f"""
+            #     labels_prefix_length: {labels_prefix_length}
+            #     """
+            # )
+            labels = torch.cat([
+                torch.full((labels.shape[0], labels_prefix_length), self.tokenizer.pad_token_id, device=labels.device),
+                labels], dim=1)
+            labels = labels.masked_fill(labels == self.tokenizer.pad_token_id, -100)
+            labels[labels == self.tokenizer.pad_token_id] = -100
+
+            attention_mask = torch.cat([attention_mask,
+                                        labels_attention_mask], dim=1)
+            
+            # print(
+            #     f"""
+            #     inputs_embeds shape: {inputs_embeds.shape}
+            #     attention_mask shape: {attention_mask.shape}
+            #     labels shape: {labels.shape}
+            #     """
+            # )
+
+            # Print causal LM forward
+            # print(
+            #     f"self.llm forward required inputs: \n ",
+            #     self.llm.forward.__code__.co_varnames[:self.llm.forward.__code__.co_argcount]
+            # )
+
+            out = self.llm(inputs_embeds = inputs_embeds,
+                        attention_mask = attention_mask,
+                        labels = labels,
+                        return_dict = True,
+                        )
+            
+            # print(
+            #     f"self.llm forward output: \n ",
+            #     out.keys()
+            # )
+            
+            inputs_embeds = inputs_embeds[:, labels_prefix_length:]
+            attention_mask = attention_mask[:, labels_prefix_length:]
+            loss = out['loss']
+            
 
         stack_out = {
             # use for inference
@@ -315,7 +378,7 @@ class Uni_Sign(nn.Module):
         inputs_embeds = pre_compute_item['inputs_embeds']
         attention_mask = pre_compute_item['attention_mask']
        
-        out = self.mt5_model.generate(inputs_embeds = inputs_embeds,
+        out = self.llm.generate(inputs_embeds = inputs_embeds,
                                 attention_mask = attention_mask,
                                 max_new_tokens=max_new_tokens,
                                 num_beams = num_beams,

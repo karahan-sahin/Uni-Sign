@@ -269,18 +269,28 @@ def sableu(references, hypotheses, tokenizer):
 
 def translation_performance(txt_ref, txt_hyp):
     from rouge import Rouge as SLT_Rouge
-    rouge=SLT_Rouge()
-    scores = rouge.get_scores(txt_hyp, txt_ref, avg=True)
-    scores['rouge-l']['f'] = scores['rouge-l']['f']*100
+    try:
+        rouge=SLT_Rouge()
+        scores = rouge.get_scores(txt_hyp, txt_ref, avg=True)
+        scores['rouge-l']['f'] = scores['rouge-l']['f']*100
+
+    except Exception as e:
+        print(f"Error calculating Rouge: {e}")
+        scores = {'rouge-l': {'f': 0.0}}
     
-    tokenizer_args = '13a'
-    # print('Signature: BLEU+case.mixed+numrefs.1+smooth.exp+tok.%s+version.1.4.2' % tokenizer_args)
-    sableu_dict = sableu(references=txt_ref, hypotheses=txt_hyp, tokenizer=tokenizer_args)
-    # print('BLEU', sableu_dict)
-    # print('Signature: chrF2+case.mixed+numchars.6+numrefs.1+space.False+version.1.4.2')
-    # print('Chrf', chrf(references=txt_ref, hypotheses=txt_hyp))
-   
-    print(sableu_dict)
+    try:
+        tokenizer_args = '13a'
+        # print('Signature: BLEU+case.mixed+numrefs.1+smooth.exp+tok.%s+version.1.4.2' % tokenizer_args)
+        sableu_dict = sableu(references=txt_ref, hypotheses=txt_hyp, tokenizer=tokenizer_args)
+        # print('BLEU', sableu_dict)
+        # print('Signature: chrF2+case.mixed+numchars.6+numrefs.1+space.False+version.1.4.2')
+        # print('Chrf', chrf(references=txt_ref, hypotheses=txt_hyp))
+    
+        print(sableu_dict)
+    except Exception as e:
+        print(f"Error calculating BLEU: {e}")
+        sableu_dict = {'bleu1': 0.0, 'bleu2': 0.0, 'bleu3': 0.0, 'bleu4': 0.0}
+        
     print(f"Rough: {scores['rouge-l']['f']:.2f}")
    
     # res = []
