@@ -314,39 +314,22 @@ class Uni_Sign(nn.Module):
 
             labels = labels.to(inputs_embeds.device)
             labels_attention_mask = labels_attention_mask.to(inputs_embeds.device)
-
+            attention_mask = torch.cat([attention_mask,
+                                        labels_attention_mask], dim=1)
+            # DECODER MODEL FORMAT
+            # FOR TRAINING, inputs_embeds should be the concatenation of prefix and labels
+            # inputs:           inputs_embeds labels [EOS]
+            # labels:           [BOS] inputs_embeds labels [EOS]
             labels_embeds = self.llm.get_input_embeddings()(labels)
             inputs_embeds = torch.cat([inputs_embeds, labels_embeds], dim=1)
 
             # labels should be the same length as inputs_embeds
             labels_prefix_length = inputs_embeds.shape[1] - labels.shape[1]
-            # print(
-            #     f"""
-            #     labels_prefix_length: {labels_prefix_length}
-            #     """
-            # )
             labels = torch.cat([
                 torch.full((labels.shape[0], labels_prefix_length), self.tokenizer.pad_token_id, device=labels.device),
                 labels], dim=1)
             labels = labels.masked_fill(labels == self.tokenizer.pad_token_id, -100)
             labels[labels == self.tokenizer.pad_token_id] = -100
-
-            attention_mask = torch.cat([attention_mask,
-                                        labels_attention_mask], dim=1)
-            
-            # print(
-            #     f"""
-            #     inputs_embeds shape: {inputs_embeds.shape}
-            #     attention_mask shape: {attention_mask.shape}
-            #     labels shape: {labels.shape}
-            #     """
-            # )
-
-            # Print causal LM forward
-            # print(
-            #     f"self.llm forward required inputs: \n ",
-            #     self.llm.forward.__code__.co_varnames[:self.llm.forward.__code__.co_argcount]
-            # )
 
             out = self.llm(inputs_embeds = inputs_embeds,
                         attention_mask = attention_mask,
@@ -354,11 +337,10 @@ class Uni_Sign(nn.Module):
                         return_dict = True,
                         )
             
-            # print(
-            #     f"self.llm forward output: \n ",
-            #     out.keys()
-            # )
-            
+            # DECODER MODEL FORMAT
+            # FOR INFERENCE, inputs_embeds should be the concatenation of prefix and labels
+            # inputs:           [BOS] inputs_embeds 
+            # labels:           none
             inputs_embeds = inputs_embeds[:, labels_prefix_length:]
             attention_mask = attention_mask[:, labels_prefix_length:]
             loss = out['loss']
