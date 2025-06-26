@@ -98,8 +98,15 @@ class Uni_Sign(nn.Module):
         self.fusion_gcn_modules['left'] = self.fusion_gcn_modules['right']
         self.proj_linear['left'] = self.proj_linear['right']
 
+        if args.model_type == 'causal':
+            self.llm = AutoModelForCausalLM.from_pretrained(args.model_name_or_path)
+            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, legacy=False)
+        elif args.model_type == 'seq2seq':
+            self.llm = AutoModelForSeq2SeqLM.from_pretrained(args.model_name_or_path)
+            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, legacy=False)
+        
         self.part_para = nn.Parameter(torch.zeros(hidden_dim*len(self.modes)))
-        self.pose_proj = nn.Linear(256*4, 512)
+        self.pose_proj = nn.Linear(256*4, self.llm.get_input_embeddings().weight.shape[1])
         
         self.apply(self._init_weights)
         
@@ -138,13 +145,7 @@ class Uni_Sign(nn.Module):
                     nn.init.constant_(layer.weight, 0)
                     nn.init.constant_(layer.bias, 0)
 
-        if args.model_type == 'causal':
-            self.llm = AutoModelForCausalLM.from_pretrained(args.model_name_or_path)
-            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, legacy=False)
-        elif args.model_type == 'seq2seq':
-            self.llm = AutoModelForSeq2SeqLM.from_pretrained(args.model_name_or_path)
-            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, legacy=False)
-        
+
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             trunc_normal_(m.weight, std=.02)
