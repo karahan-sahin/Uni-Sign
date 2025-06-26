@@ -558,4 +558,10 @@ def get_args_parser():
                              "This will determine how the pose data is processed and interpreted. "
                              "Ensure that the pose data is compatible with the selected format.")
 
+    parser.add_argument("--phase", default="train", type=str, choices=["train", "gold"],
+                        help="The phase of the training process. "
+                             "Options are 'train' or 'gold'. "
+                             "This will determine the specific training configuration and data handling. "
+                             "For example, 'train' is used for regular training, while 'gold' may be used for final evaluation or testing phases.")
+ 
     return parser
