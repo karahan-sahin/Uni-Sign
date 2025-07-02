@@ -6,7 +6,7 @@ train_label_paths = {
                     "CSL_News": "/mnt/fast/nobackup/scratch4weeks/ef0036/cslnews/data/train/CSL_News_Labels.json",
                     "CSL_Daily": "./data/CSL_Daily/labels.train",
                     "WLASL": "./data/WLASL/labels-2000.train",
-                    "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.train.subset.csv"
+                    "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.train.csv"
                     }
 
 dev_label_paths = {
