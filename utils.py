@@ -563,5 +563,13 @@ def get_args_parser():
                              "Options are 'train' or 'gold'. "
                              "This will determine the specific training configuration and data handling. "
                              "For example, 'train' is used for regular training, while 'gold' may be used for final evaluation or testing phases.")
- 
+    
+    parser.add_argument("--dev", default=False, action="store_true",
+                        help="Whether to run in development mode. "
+                             "If set, the training will run with a smaller dataset and fewer epochs for quick testing. "
+                             "This is useful for debugging and ensuring that the training pipeline works correctly before running on the full dataset. "
+                             "In development mode, the training will be faster but may not yield optimal results. "
+                             "This is particularly useful for testing new features or configurations without waiting for the full training to complete. "
+                             "Make sure to set this to False when running the final training.")
+    
     return parser
