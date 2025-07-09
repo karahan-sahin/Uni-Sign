@@ -210,15 +210,6 @@ class Uni_Sign(nn.Module):
         return gcn_feat
 
     def forward(self, src_input, tgt_input):
-        # RGB branch forward
-        if self.args.rgb_support:
-            rgb_support_dict = {}
-            for index_key, rgb_key in zip(['left_sampled_indices', 'right_sampled_indices'], ['left_hands', 'right_hands']):
-                rgb_feat = self.rgb_support_backbone(src_input[rgb_key])
-                
-                rgb_support_dict[index_key] = src_input[index_key]
-                rgb_support_dict[rgb_key] = rgb_feat
-        
         # Pose branch forward
         features = []
 
@@ -234,27 +225,9 @@ class Uni_Sign(nn.Module):
             else:
                 assert not body_feat is None
                 if part == 'left':
-                    # Pose RGB fusion
-                    if self.args.rgb_support:
-                        gcn_feat = self.gather_feat_pose_rgb(gcn_feat, 
-                                                            rgb_support_dict[f'{part}_hands'], 
-                                                            rgb_support_dict[f'{part}_sampled_indices'], 
-                                                            src_input[f'{part}_rgb_len'],
-                                                            src_input[f'{part}_skeletons_norm'],
-                                                            )
-                        
                     gcn_feat = gcn_feat + body_feat[..., -2][...,None].detach()
                     
                 elif part == 'right':
-                    # Pose RGB fusion
-                    if self.args.rgb_support:
-                        gcn_feat = self.gather_feat_pose_rgb(gcn_feat, 
-                                                                rgb_support_dict[f'{part}_hands'], 
-                                                                rgb_support_dict[f'{part}_sampled_indices'],
-                                                                src_input[f'{part}_rgb_len'],
-                                                                src_input[f'{part}_skeletons_norm'],
-                                                                )
-                        
                     gcn_feat = gcn_feat + body_feat[..., -1][...,None].detach()
 
                 elif part == 'face_all':
@@ -264,12 +237,16 @@ class Uni_Sign(nn.Module):
                     raise NotImplementedError
             
             # temporal gcn forward
+            # print(f'part: {part}, gcn_feat shape: {gcn_feat.shape}')
             gcn_feat = self.fusion_gcn_modules[part](gcn_feat) #B,C,T,V
+            # print(f'part: {part}, temporal gcn_feat shape: {gcn_feat.shape}')
             pool_feat = gcn_feat.mean(-1).transpose(1,2) #B,T,C
             features.append(pool_feat)
-        
+
+
         # concat sub-pose feature across token dimension
         inputs_embeds = torch.cat(features, dim=-1) + self.part_para
+        print(f'final pose_embed after stgcn: {inputs_embeds.shape}')
         inputs_embeds = self.pose_proj(inputs_embeds)
 
         prefix_token = self.tokenizer(
