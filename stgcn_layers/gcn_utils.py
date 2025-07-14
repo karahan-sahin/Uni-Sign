@@ -28,13 +28,13 @@ class Graph:
 
     """
 
-    def __init__(self, layout='custom', strategy='uniform', max_hop=1, dilation=1, pose_format="openpose"):
+    def __init__(self, layout='custom', strategy='uniform', max_hop=1, dilation=1, pose_format="rmtpose_2d"):
         self.max_hop = max_hop
         self.dilation = dilation
 
-        if pose_format == "openpose":
-            self.get_edge(layout)
-        elif pose_format == "mediapipe":
+        if pose_format == "rtmpose_2d":
+            self._get_edge_rtm(layout)
+        elif "mediapipe" in pose_format:
             self._get_edge_mp(layout)
         else:
             raise ValueError("Unsupported pose format. Use 'openpose' or 'mediapipe'.")
@@ -145,7 +145,64 @@ class Graph:
         
         return self.edge, self.center
 
-
+    def _get_edge_rtm(self, layout):
+        # 'body', 'left', 'right', 'mouth', 'face'
+        # if layout == 'custom_hand21':
+        if layout == 'left' or layout == 'right':
+            self.num_node = 21
+            self_link = [(i, i) for i in range(self.num_node)]
+            neighbor_1base = [
+                [0, 1],
+                [1, 2],
+                [2, 3],
+                [3, 4],
+                [0, 5],
+                [5, 6],
+                [6, 7],
+                [7, 8],
+                [0, 9],
+                [9, 10],
+                [10, 11],
+                [11, 12],
+                [0, 13],
+                [13, 14],
+                [14, 15],
+                [15, 16],
+                [0, 17],
+                [17, 18],
+                [18, 19],
+                [19, 20],
+            ]
+            neighbor_link = neighbor_1base
+            self.edge = self_link + neighbor_link
+            self.center = 0
+        
+        elif layout == 'body':
+            self.num_node = 9
+            self_link = [(i, i) for i in range(self.num_node)]
+            neighbor_1base = [
+                [0, 1],
+                [0, 2],
+                [0, 3],
+                [0, 4],
+                [3, 5],
+                [5, 7],
+                [4, 6],
+                [6, 8],
+            ]
+            neighbor_link = neighbor_1base
+            self.edge = self_link + neighbor_link
+            self.center = 0
+        elif layout == 'face_all':
+            self.num_node = 9 + 8 + 1
+            self_link = [(i, i) for i in range(self.num_node)]
+            neighbor_1base = [[i, i + 1] for i in range(9 - 1)] + \
+                             [[i, i + 1] for i in range(9, 9 + 8 - 1)] + \
+                             [[9 + 8 - 1, 9]] + \
+                             [[17, i] for i in range(17)]
+            neighbor_link = neighbor_1base
+            self.edge = self_link + neighbor_link
+            self.center = self.num_node - 1
 
     def get_adjacency(self, strategy):
         valid_hop = range(0, self.max_hop + 1, self.dilation)

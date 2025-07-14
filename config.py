@@ -6,21 +6,24 @@ train_label_paths = {
                     "CSL_News": "/mnt/fast/nobackup/scratch4weeks/ef0036/cslnews/data/train/CSL_News_Labels.json",
                     "CSL_Daily": "./data/CSL_Daily/labels.train",
                     "WLASL": "./data/WLASL/labels-2000.train",
-                    "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.train.csv"
+                    "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.train.csv",
+                    "How2Sign": "/home/ks0085/Documents/Datasets/how2sign/how2sign.train.csv"
                     }
 
 dev_label_paths = {
                     "CSL_News": "/mnt/fast/nobackup/scratch4weeks/ef0036/cslnews/data/train/CSL_News_Labels.json",
                     "CSL_Daily": "./data/CSL_Daily/labels.dev",
                     "WLASL": "./data/WLASL/labels-2000.dev",
-                    "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.dev.csv"
+                    "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.dev.csv",
+                    "How2Sign": "/home/ks0085/Documents/Datasets/how2sign/how2sign.dev.csv"
                     }
 
 test_label_paths = {
                     "CSL_News": "/mnt/fast/nobackup/scratch4weeks/ef0036/cslnews/data/train/CSL_News_Labels.json",
                     "CSL_Daily": "./data/CSL_Daily/labels.test",
                     "WLASL": "./data/WLASL/labels-2000.test",
-                    "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.test.csv"
+                    "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.test.csv",
+                    "How2Sign": "/home/ks0085/Documents/Datasets/how2sign/how2sign.test.csv"
                     }
 
 
@@ -29,7 +32,6 @@ rgb_dirs = {
             "CSL_News": '/mnt/fast/nobackup/scratch4weeks/ef0036/cslnews/rgb_format',
             "CSL_Daily": './dataset/CSL_Daily/sentence-crop',
             "WLASL": "./dataset/WLASL/rgb_format"
-
             }
 
 # pose paths
@@ -37,5 +39,6 @@ pose_dirs = {
             "CSL_News": '/mnt/fast/nobackup/scratch4weeks/ef0036/cslnews/rgb_format',
             "CSL_Daily": '/mnt/fast/nobackup/scratch4weeks/ef0036/csl_daily/pose_format',
             "WLASL": "/mnt/fast/nobackup/scratch4weeks/ef0036/wlasl",
-            "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/mediapipe"
+            "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/mediapipe",
+            "How2Sign": "/home/ks0085/Documents/Datasets/how2sign/"
             }

@@ -83,9 +83,9 @@ class Uni_Sign(nn.Module):
         self.proj_linear = nn.ModuleDict()
         for mode in self.modes:
             print(f'Building graph for {mode}...')
-            self.graph[mode] = Graph(layout=f'{mode}', strategy='distance', max_hop=1, pose_format=args.pose_format)
+            self.graph[mode] = Graph(layout=f'{mode}', strategy='distance', max_hop=1, pose_format="rtmpose_2d")
             A.append(torch.tensor(self.graph[mode].A, dtype=torch.float32, requires_grad=False))
-            self.proj_linear[mode] = nn.Linear(4, 64)
+            self.proj_linear[mode] = nn.Linear(3, 64)
 
         self.gcn_modules = nn.ModuleDict()
         self.fusion_gcn_modules = nn.ModuleDict()
@@ -246,7 +246,6 @@ class Uni_Sign(nn.Module):
 
         # concat sub-pose feature across token dimension
         inputs_embeds = torch.cat(features, dim=-1) + self.part_para
-        print(f'final pose_embed after stgcn: {inputs_embeds.shape}')
         inputs_embeds = self.pose_proj(inputs_embeds)
 
         prefix_token = self.tokenizer(

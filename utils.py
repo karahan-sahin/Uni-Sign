@@ -523,7 +523,9 @@ def get_args_parser():
     parser.add_argument("--max_length", default=128, type=int)
     
     # select dataset
-    parser.add_argument("--dataset", default="CSL_Daily", choices=['CSL_News', "CSL_Daily", "WLASL", "BOBSL"])
+    parser.add_argument("--dataset", default="CSL_Daily", choices=[
+        'CSL_News', "CSL_Daily", "WLASL", "BOBSL", "How2Sign"
+    ], help="The dataset to use for training. ")
     
     # select task
     parser.add_argument("--task", default="SLT", choices=['SLT', "ISLR", "CSLR"])
