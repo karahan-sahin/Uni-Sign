@@ -7,7 +7,7 @@ train_label_paths = {
                     "CSL_Daily": "./data/CSL_Daily/labels.train",
                     "WLASL": "./data/WLASL/labels-2000.train",
                     "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.train.csv",
-                    "How2Sign": "/home/ks0085/Documents/Datasets/how2sign/how2sign.train.csv"
+                    "How2Sign": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/how2sign/how2sign.train.csv"
                     }
 
 dev_label_paths = {
@@ -15,7 +15,7 @@ dev_label_paths = {
                     "CSL_Daily": "./data/CSL_Daily/labels.dev",
                     "WLASL": "./data/WLASL/labels-2000.dev",
                     "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.dev.csv",
-                    "How2Sign": "/home/ks0085/Documents/Datasets/how2sign/how2sign.dev.csv"
+                    "How2Sign": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/how2sign/how2sign.dev.csv"
                     }
 
 test_label_paths = {
@@ -23,7 +23,7 @@ test_label_paths = {
                     "CSL_Daily": "./data/CSL_Daily/labels.test",
                     "WLASL": "./data/WLASL/labels-2000.test",
                     "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/bobsl.test.csv",
-                    "How2Sign": "/home/ks0085/Documents/Datasets/how2sign/how2sign.test.csv"
+                    "How2Sign": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/how2sign/how2sign.test.csv"
                     }
 
 
@@ -40,5 +40,5 @@ pose_dirs = {
             "CSL_Daily": '/mnt/fast/nobackup/scratch4weeks/ef0036/csl_daily/pose_format',
             "WLASL": "/mnt/fast/nobackup/scratch4weeks/ef0036/wlasl",
             "BOBSL": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/bobsl/mediapipe",
-            "How2Sign": "/home/ks0085/Documents/Datasets/how2sign/"
+            "How2Sign": "/mnt/fast/nobackup/scratch4weeks/ks0085/datasets/how2sign/"
             }
