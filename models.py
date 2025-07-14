@@ -76,27 +76,6 @@ class Uni_Sign(nn.Module):
         self.args = args
         
         self.modes = ['body', 'left', 'right', 'face_all']
-        
-        self.graph, A = {}, []
-        # project (x,y,score) to hidden dim
-        hidden_dim = args.hidden_dim
-        self.proj_linear = nn.ModuleDict()
-        for mode in self.modes:
-            print(f'Building graph for {mode}...')
-            self.graph[mode] = Graph(layout=f'{mode}', strategy='distance', max_hop=1, pose_format="rtmpose_2d")
-            A.append(torch.tensor(self.graph[mode].A, dtype=torch.float32, requires_grad=False))
-            self.proj_linear[mode] = nn.Linear(3, 64)
-
-        self.gcn_modules = nn.ModuleDict()
-        self.fusion_gcn_modules = nn.ModuleDict()
-        spatial_kernel_size = A[0].size(0)
-        for index, mode in enumerate(self.modes):
-            self.gcn_modules[mode], final_dim = get_stgcn_chain(64, 'spatial', (1, spatial_kernel_size), A[index].clone(), True)
-            self.fusion_gcn_modules[mode], _ = get_stgcn_chain(final_dim, 'temporal', (5, spatial_kernel_size), A[index].clone(), True)
-        
-        self.gcn_modules['left'] = self.gcn_modules['right']
-        self.fusion_gcn_modules['left'] = self.fusion_gcn_modules['right']
-        self.proj_linear['left'] = self.proj_linear['right']
 
         if args.model_type == 'causal':
             self.llm = AutoModelForCausalLM.from_pretrained(args.model_name_or_path)
@@ -105,46 +84,45 @@ class Uni_Sign(nn.Module):
             self.llm = AutoModelForSeq2SeqLM.from_pretrained(args.model_name_or_path)
             self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, legacy=False)
         
-        self.part_para = nn.Parameter(torch.zeros(hidden_dim*len(self.modes)))
-        self.pose_proj = nn.Linear(256*4, self.llm.get_input_embeddings().weight.shape[1])
-        
-        self.apply(self._init_weights)
+        if args.encoder_type == 'stgcn':
+            self.graph, A = {}, []
+            # project (x,y,score) to hidden dim
+            hidden_dim = args.hidden_dim
+            self.proj_linear = nn.ModuleDict()
+            for mode in self.modes:
+                print(f'Building graph for {mode}...')
+                self.graph[mode] = Graph(layout=f'{mode}', strategy='distance', max_hop=1, pose_format="rtmpose_2d")
+                A.append(torch.tensor(self.graph[mode].A, dtype=torch.float32, requires_grad=False))
+                self.proj_linear[mode] = nn.Linear(3, 64)
+
+            self.gcn_modules = nn.ModuleDict()
+            self.fusion_gcn_modules = nn.ModuleDict()
+            spatial_kernel_size = A[0].size(0)
+            for index, mode in enumerate(self.modes):
+                self.gcn_modules[mode], final_dim = get_stgcn_chain(64, 'spatial', (1, spatial_kernel_size), A[index].clone(), True)
+                self.fusion_gcn_modules[mode], _ = get_stgcn_chain(final_dim, 'temporal', (5, spatial_kernel_size), A[index].clone(), True)
+            
+            self.gcn_modules['left'] = self.gcn_modules['right']
+            self.fusion_gcn_modules['left'] = self.fusion_gcn_modules['right']
+            self.proj_linear['left'] = self.proj_linear['right']
+            self.part_para = nn.Parameter(torch.zeros(hidden_dim*len(self.modes)))
+            self.pose_proj = nn.Linear(256*4, self.llm.get_input_embeddings().weight.shape[1])
+            
+            self.apply(self._init_weights)
+
+        elif args.encoder_type == 'mlp':
+            self.pose_proj = nn.Sequential(
+                nn.Linear(207, 207),
+                nn.ReLU(),
+                nn.Dropout(0.3),
+                nn.Linear(207, self.llm.get_input_embeddings().weight.shape[1])
+            )
+            self.apply(self._init_weights)
         
         if "CSL" in self.args.dataset:
             self.lang = 'Chinese'
         else:
             self.lang = 'English'
-        
-        if self.args.rgb_support:
-            self.rgb_support_backbone = torch.nn.Sequential(*list(torchvision.models.efficientnet_b0(pretrained=True).children())[:-2])
-            self.rgb_proj = nn.Conv2d(1280, hidden_dim, kernel_size=1)
-
-            self.fusion_pose_rgb_linear = nn.Linear(hidden_dim, hidden_dim)
-            
-            # PGF
-            self.fusion_pose_rgb_DA = DeformableAttention2D(
-                                        dim = hidden_dim,            # feature dimensions
-                                        dim_head = 32,               # dimension per head
-                                        heads = 8,                   # attention heads
-                                        dropout = 0.,                # dropout
-                                        downsample_factor = 1,       # downsample factor (r in paper)
-                                        offset_scale = None,         # scale of offset, maximum offset
-                                        offset_groups = None,        # number of offset groups, should be multiple of heads
-                                        offset_kernel_size = 1,      # offset kernel size
-                                    )
-            
-            self.fusion_gate = nn.Sequential(nn.Conv1d(hidden_dim*2, hidden_dim, 1),
-                                        nn.GELU(),
-                                        nn.Conv1d(hidden_dim, 1, 1),
-                                        nn.Tanh(),
-                                        nn.ReLU(),
-                                    )
-            
-            for layer in self.fusion_gate:
-                if isinstance(layer, nn.Conv1d):
-                    nn.init.constant_(layer.weight, 0)
-                    nn.init.constant_(layer.bias, 0)
-
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -209,44 +187,61 @@ class Uni_Sign(nn.Module):
         assert start == rgb_feat.shape[0]
         return gcn_feat
 
-    def forward(self, src_input, tgt_input):
+    def _embed_sign(self, src_input):
         # Pose branch forward
-        features = []
 
-        body_feat = None
-        for part in self.modes:
-            # project position to hidden dim
-            proj_feat = self.proj_linear[part](src_input[part]).permute(0,3,1,2) #B,C,T,V
-            # spatial gcn forward
-            gcn_feat = self.gcn_modules[part](proj_feat)
-            if part == 'body':
-                body_feat = gcn_feat
+        if self.args.encoder_type == 'stgcn':
+            features = []
 
-            else:
-                assert not body_feat is None
-                if part == 'left':
-                    gcn_feat = gcn_feat + body_feat[..., -2][...,None].detach()
-                    
-                elif part == 'right':
-                    gcn_feat = gcn_feat + body_feat[..., -1][...,None].detach()
-
-                elif part == 'face_all':
-                    gcn_feat = gcn_feat + body_feat[..., 0][...,None].detach()
+            body_feat = None
+            for part in self.modes:
+                # project position to hidden dim
+                proj_feat = self.proj_linear[part](src_input[part]).permute(0,3,1,2) #B,C,T,V
+                # spatial gcn forward
+                gcn_feat = self.gcn_modules[part](proj_feat)
+                if part == 'body':
+                    body_feat = gcn_feat
 
                 else:
-                    raise NotImplementedError
-            
-            # temporal gcn forward
-            # print(f'part: {part}, gcn_feat shape: {gcn_feat.shape}')
-            gcn_feat = self.fusion_gcn_modules[part](gcn_feat) #B,C,T,V
-            # print(f'part: {part}, temporal gcn_feat shape: {gcn_feat.shape}')
-            pool_feat = gcn_feat.mean(-1).transpose(1,2) #B,T,C
-            features.append(pool_feat)
+                    assert not body_feat is None
+                    if part == 'left':
+                        gcn_feat = gcn_feat + body_feat[..., -2][...,None].detach()
+                        
+                    elif part == 'right':
+                        gcn_feat = gcn_feat + body_feat[..., -1][...,None].detach()
 
+                    elif part == 'face_all':
+                        gcn_feat = gcn_feat + body_feat[..., 0][...,None].detach()
 
-        # concat sub-pose feature across token dimension
-        inputs_embeds = torch.cat(features, dim=-1) + self.part_para
+                    else:
+                        raise NotImplementedError
+                
+                # temporal gcn forward
+                # print(f'part: {part}, gcn_feat shape: {gcn_feat.shape}')
+                gcn_feat = self.fusion_gcn_modules[part](gcn_feat) #B,C,T,V
+                # print(f'part: {part}, temporal gcn_feat shape: {gcn_feat.shape}')
+                pool_feat = gcn_feat.mean(-1).transpose(1,2) #B,T,C
+                features.append(pool_feat)
+
+            # concat sub-pose feature across token dimension
+            inputs_embeds = torch.cat(features, dim=-1) + self.part_para
+
+        elif self.args.encoder_type == 'mlp':
+            features = []
+            for part in self.modes:
+                # project position to hidden dim
+                part_flat = src_input[part].reshape(src_input[part].shape[0], src_input[part].shape[1], -1) # B,T,V*3
+                features.append(part_flat)
+                
+            inputs_embeds = torch.cat(features, dim=-1) 
+
         inputs_embeds = self.pose_proj(inputs_embeds)
+
+        return inputs_embeds
+
+    def forward(self, src_input, tgt_input):
+
+        inputs_embeds = self._embed_sign(src_input)
 
         prefix_token = self.tokenizer(
                                 [f"Translate sign language video to {self.lang}: "] * len(tgt_input["gt_sentence"]),
@@ -255,7 +250,6 @@ class Uni_Sign(nn.Module):
                                 return_tensors="pt",
                             ).to(inputs_embeds.device)
         
-        # prefix_embeds = self.llm.encoder.embed_tokens(prefix_token['input_ids'])
         prefix_embeds = self.llm.get_input_embeddings()(prefix_token['input_ids'])
         inputs_embeds = torch.cat([prefix_embeds, inputs_embeds], dim=1)
 
