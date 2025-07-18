@@ -112,10 +112,10 @@ class Uni_Sign(nn.Module):
 
         elif args.encoder_type == 'mlp':
             self.pose_proj = nn.Sequential(
-                nn.Linear(207, 207),
+                nn.Linear(args.nb_joints, args.nb_joints),
                 nn.ReLU(),
                 nn.Dropout(0.3),
-                nn.Linear(207, self.llm.get_input_embeddings().weight.shape[1])
+                nn.Linear(args.nb_joints, self.llm.get_input_embeddings().weight.shape[1])
             )
             self.apply(self._init_weights)
         

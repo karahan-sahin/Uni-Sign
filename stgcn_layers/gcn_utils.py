@@ -178,7 +178,7 @@ class Graph:
             self.center = 0
         
         elif layout == 'body':
-            self.num_node = 9
+            self.num_node = 11
             self_link = [(i, i) for i in range(self.num_node)]
             neighbor_1base = [
                 [0, 1],
@@ -189,6 +189,10 @@ class Graph:
                 [5, 7],
                 [4, 6],
                 [6, 8],
+                [3, 4],
+                [3, 9],
+                [4, 10],
+                [9, 10],
             ]
             neighbor_link = neighbor_1base
             self.edge = self_link + neighbor_link
